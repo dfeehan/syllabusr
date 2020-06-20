@@ -1,11 +1,16 @@
-Package: syllabusdates
+Package: syllabusr
 Type: Package
-Title: What the Package Does (Title Case)
+Title: Tools for creating a syllabus
 Version: 0.1.0
-Author: Who wrote it
-Maintainer: The package maintainer <yourself@somewhere.net>
-Description: More about what it does (maybe more than one line)
-    Use four spaces when indenting paragraphs within the Description.
+Author: Dennis M. Feehan 
+Maintainer: Dennis M. Feehan <feehan@berkeley.edu>
+Description: Some helpful tools for creating syllabi. 
+  Currently, the tools are mostly related to keeping track of dates.
 License: What license is it under?
 Encoding: UTF-8
 LazyData: true
+Imports:
+  lubridate,
+  purrr,
+  glue
+RoxygenNote: 7.1.0

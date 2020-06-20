@@ -7,6 +7,7 @@
 #' @param readable if TRUE, return a string; if FALSE, return a date object (defaults to TRUE)
 #'
 #' @return Either a string or a date object with the date of the `class_num`th class
+#' @export
 class_date <- function(class_num, base = base_date, pattern, readable=TRUE) {
 
   if (! pattern %in% c("M", "Tu", "W", "Th", "F", "MW", "TuTh", "MWF")) {
@@ -16,9 +17,7 @@ class_date <- function(class_num, base = base_date, pattern, readable=TRUE) {
   if(pattern %in% c("M", "Tu", "W", "Th", "F")) {
     num_weeks <- ceiling((class_num - 1))
 
-    dow <- switch(pattern,
-                  M=1, Tu=2, W=3, Th=4, F=5)
-    intervals <- cumsum(dow, num_weeks))
+    intervals <- cumsum(rep(7, num_weeks))
 
   } else if (pattern %in% c("TuTh", "MW")) {
 
@@ -26,7 +25,8 @@ class_date <- function(class_num, base = base_date, pattern, readable=TRUE) {
 
     if(pattern == 'TuTh') {
 
-      if (wday(base_date) == 'Tue') {
+      if (lubridate::wday(base_date) == 3) {
+        # base_date is tuesday
         intervals <- cumsum(rep(c(2,5), num_weeks))
       } else {
         # base_date is thursday
@@ -35,7 +35,8 @@ class_date <- function(class_num, base = base_date, pattern, readable=TRUE) {
 
     } else {
       # pattern is MW
-      if (wday(base_date) == 'Mon') {
+      if (lubridate::wday(base_date) == 2) {
+        # base_date is monday
         intervals <- cumsum(rep(c(2,5), num_weeks))
       } else {
         # base_date is wednesday
@@ -46,9 +47,11 @@ class_date <- function(class_num, base = base_date, pattern, readable=TRUE) {
     num_weeks <- ceiling((class_num-1)/3)
 
     # pattern is MWF
-    if (wday(base_date) == 'Mon') {
+    if (lubridate::wday(base_date) == 2) {
+      # base_date is monday
       intervals <- cumsum(rep(c(2,2,3), num_weeks))
-    } else if (wday(base_date) == 'Wed') {
+    } else if (lubridate::wday(base_date) == 4) {
+      # base_date is wednesday
       intervals <- cumsum(rep(c(2,3,2), num_weeks))
     } else {
       # base_date is friday
@@ -56,7 +59,7 @@ class_date <- function(class_num, base = base_date, pattern, readable=TRUE) {
     }
   }
 
-  class_dates <- map(intervals, ~ base_date + ddays(.x))
+  class_dates <- purrr::map(intervals, ~ base_date + lubridate::ddays(.x))
 
   if (class_num == 1) {
     newdate <- base_date
@@ -66,10 +69,10 @@ class_date <- function(class_num, base = base_date, pattern, readable=TRUE) {
 
   if (readable) {
     # return a readable string
-    return(glue('{weekday}, {month} {day}',
-                weekday=wday(newdate, label=TRUE, abbr=TRUE),
-                month=month(newdate, label=TRUE),
-                day=day(newdate)))
+    return(glue::glue('{weekday}, {month} {day}',
+                weekday=lubridate::wday(newdate, label=TRUE, abbr=TRUE),
+                month=lubridate::month(newdate, label=TRUE),
+                day=lubridate::day(newdate)))
   } else {
     # return the date object
     return(newdate)
@@ -80,27 +83,25 @@ class_date <- function(class_num, base = base_date, pattern, readable=TRUE) {
 #'
 #' @param date The date
 #' @param base The date of the first class
+#'
+#' @return The week in which the given class takes place. (The week with the first class is week 1)
+#' @export
 week_num <- function(date, base = base_date) {
   if (! is.Date(date)) {
     date <- as.Date(date)
   }
 
-  return(epiweek(date) - epiweek(base) + 1)
+  return(lubridate::epiweek(date) - lubridate::epiweek(base) + 1)
 
 }
 
 #' Create a function that returns date of subsequent classes each time it's called
 #'
 #' @param base The date of the first class
-#' @param pattern See details
+#' @param pattern See `make_class_date`
 #'
 #' @return A function that, when called, returns the date of the next class
-#'
-#' @details Pattern has a string with the class meeting pattern.
-#' Options currently supported are
-#' * "M", "Tu", "W", "Th", or "F" for weekly classes
-#' * "TuTh", "MW" for classes that meet twice a week
-#' * "MWF" for classes that meet three times a week
+#' @export
 make_next_class_date <- function(base = base_date, pattern) {
   cur_cd <- 0
   get_cd <- function(x) {
@@ -110,32 +111,22 @@ make_next_class_date <- function(base = base_date, pattern) {
   return(get_cd)
 }
 
-next_class <- make_next_class_date(base_date)
-
-# i use this for grad classes, which meet once a week
-week_date <- function(week_num, base = base_date) {
-  newdate <- base + dweeks(week_num - 1)
-  #return(format(newdate, "%B %d"))
-  return(glue('{weekday}, {month} {day}',
-              weekday=wday(newdate, label=TRUE, abbr=TRUE),
-              month=month(newdate, label=TRUE),
-              day=day(newdate)))
-}
-
-#' Create a function that returns date of subsequent classes each time it's called
+#' Create a function that returns date of the given class number
 #'
 #' @param base The date of the first class
+#' @param pattern See details
 #'
-#' @details
-#' see
-#' https://stackoverflow.com/questions/1088639/static-variables-in-r
-#' for helpful info on static functions in R
-make_next_week <- function(base = base_date) {
-  cur_week <- 0
-  get_week <- function(x) {
-    cur_week <<- cur_week + 1
-    return(week_date(cur_week, base))
-  }
-  return(get_week)
+#' @return A function that takes one argument: class_num.
+#' When called, the function returns the date of the class
+#' with the given number.
+#'
+#' @details Pattern has a string with the class meeting pattern.
+#' Options currently supported are
+#' * "M", "Tu", "W", "Th", or "F" for weekly classes
+#' * "TuTh", "MW" for classes that meet twice a week
+#' * "MWF" for classes that meet three times a week
+#' @export
+make_class_date <- function(base = base_date, pattern) {
+  return(purrr::partial(class_date, base=base, pattern=pattern))
 }
 
